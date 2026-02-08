@@ -76,10 +76,10 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Very aggressive limits to ensure fast response
+        # Very aggressive limits - prioritize speed over depth
         result = self.engine.analyse(
             self.board, 
-            chess.engine.Limit(time=5.0, depth=6, nodes=100000),
+            chess.engine.Limit(time=3.0, depth=5, nodes=50000),
             multipv=1
         )
         
@@ -109,9 +109,9 @@ class ChessGame:
             return None
         
         if difficulty == 'easy':
-            result = self.engine.play(self.board, chess.engine.Limit(time=1.0, depth=4, nodes=20000))
+            result = self.engine.play(self.board, chess.engine.Limit(time=0.5, depth=3, nodes=10000))
         else:
-            result = self.engine.play(self.board, chess.engine.Limit(time=3.0, depth=6, nodes=100000))
+            result = self.engine.play(self.board, chess.engine.Limit(time=1.5, depth=5, nodes=50000))
         
         return result.move
     
