@@ -279,12 +279,6 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     
-    if os.environ.get('RENDER'):
-        print(f"Running on Render, port {port}")
-        app.run(host='0.0.0.0', port=port, debug=False)
-    else:
-        print("Opening browser...")
-        threading.Thread(target=open_browser, daemon=True).start()
-        app.run(debug=False, port=5000)
-    
-    game.close()
+    print("Opening browser...")
+    threading.Thread(target=open_browser, daemon=True).start()
+    app.run(debug=False, port=5000)
