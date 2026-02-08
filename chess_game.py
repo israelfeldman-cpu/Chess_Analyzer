@@ -176,7 +176,11 @@ def find_stockfish():
 stockfish_path = find_stockfish()
 if not stockfish_path:
     print("Error: Stockfish not found!")
-    exit(1)
+    print("Looking in these locations:")
+    print("  - stockfish/stockfish")
+    print("  - stockfish/stockfish-ubuntu-x86-64-avx2")
+    print("  - /usr/games/stockfish")
+    raise FileNotFoundError("Stockfish executable not found. Please check build.sh succeeded.")
 
 game = ChessGame(stockfish_path)
 
