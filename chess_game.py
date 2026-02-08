@@ -2,12 +2,14 @@ import chess
 import chess.engine
 import chess.svg
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import webbrowser
 import threading
 import time
+import os
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'chess-game-secret-key-change-in-production')
 
 class ChessGame:
     def __init__(self, stockfish_path):
@@ -157,6 +159,19 @@ class ChessGame:
             return "Check!"
         return ""
     
+    def get_state(self):
+        """Get current game state for session storage"""
+        return {
+            'fen': self.board.fen(),
+            'history': self.move_history
+        }
+    
+    def set_state(self, state):
+        """Restore game state from session"""
+        if state and 'fen' in state:
+            self.board.set_fen(state['fen'])
+            self.move_history = state.get('history', [])
+    
     def close(self):
         self.engine.quit()
 
@@ -191,10 +206,17 @@ game = ChessGame(stockfish_path)
 
 @app.route('/')
 def index():
+    # Load game state from session if it exists
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
     return render_template('chess.html')
 
 @app.route('/board')
 def get_board():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
     selected = request.args.get('selected', None)
     legal = request.args.get('legal', None)
     legal_moves = legal.split(',') if legal else None
@@ -202,8 +224,15 @@ def get_board():
 
 @app.route('/move', methods=['POST'])
 def move():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
     data = request.json
     result = game.make_move(data['move'])
+    
+    # Save game state to session
+    session['game_state'] = game.get_state()
     
     return jsonify({
         **result,
@@ -216,6 +245,10 @@ def move():
 
 @app.route('/legal_moves', methods=['POST'])
 def legal_moves():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
     data = request.json
     moves = game.get_legal_moves(data['square'])
     board_svg = game.get_board_svg(data['square'], moves)
@@ -223,6 +256,10 @@ def legal_moves():
 
 @app.route('/best_move', methods=['GET'])
 def best_move():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
     best_moves = game.get_best_move()
     if best_moves:
         return jsonify({
@@ -234,6 +271,11 @@ def best_move():
 @app.route('/reset', methods=['POST'])
 def reset():
     game.reset()
+    # Clear session
+    session.pop('game_state', None)
+    # Save new empty game state
+    session['game_state'] = game.get_state()
+    
     return jsonify({
         'success': True,
         'board': game.get_board_svg(),
@@ -243,8 +285,15 @@ def reset():
 
 @app.route('/undo', methods=['POST'])
 def undo():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
     result = game.undo_move()
     if result['success']:
+        # Save updated state
+        session['game_state'] = game.get_state()
+        
         return jsonify({
             'success': True,
             'board': game.get_board_svg(),
@@ -257,6 +306,10 @@ def undo():
 
 @app.route('/computer_move', methods=['POST'])
 def computer_move():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
     data = request.json
     difficulty = data.get('difficulty', 'normal') if data else 'normal'
     
@@ -265,6 +318,9 @@ def computer_move():
         san = game.board.san(move)
         game.board.push(move)
         game.move_history.append(san)
+        
+        # Save updated state
+        session['game_state'] = game.get_state()
         
         return jsonify({
             'success': True,
