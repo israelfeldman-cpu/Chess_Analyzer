@@ -425,7 +425,7 @@
                 if (seconds >= 60) {
                     stopTimer();
                     document.getElementById('loading').classList.remove('show');
-                    document.getElementById('best-moves').innerHTML = '⚠️ Analysis timeout (>60s). Position may be too complex. Try again or make a move.';
+                    document.getElementById('best-moves').innerHTML = '⏱️ The Analysis of best move Stopped! Position may be too complex. Try again or make a move.';
                     document.getElementById('best-moves').classList.add('show');
                 }
             }, 1000);
@@ -470,9 +470,9 @@
                     stopTimer();
                     document.getElementById('loading').classList.remove('show');
                     if (error.name === 'AbortError') {
-                        document.getElementById('best-moves').innerHTML = '⚠️ Analysis stopped after 60 seconds. Please try again.';
+                        document.getElementById('best-moves').innerHTML = '⏱️ The Analysis of best move Stopped! Please try again.';
                     } else {
-                        document.getElementById('best-moves').innerHTML = '❌ Error analyzing position. Please try again.';
+                        document.getElementById('best-moves').innerHTML = '⏱️ The Analysis of best move Stopped! Please try again.';
                     }
                     document.getElementById('best-moves').classList.add('show');
                 });
