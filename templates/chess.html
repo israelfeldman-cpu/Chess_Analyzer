@@ -420,13 +420,26 @@
             timerInterval = setInterval(() => {
                 seconds++;
                 timerElement.textContent = seconds + 's';
+                
+                // Force stop after 60 seconds
+                if (seconds >= 60) {
+                    stopTimer();
+                    document.getElementById('loading').classList.remove('show');
+                    document.getElementById('best-moves').innerHTML = '⚠️ Analysis timeout (>60s). Position may be too complex. Try again or make a move.';
+                    document.getElementById('best-moves').classList.add('show');
+                }
             }, 1000);
             
             const startTime = Date.now();
             
-            fetch('/best_move')
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+            
+            fetch('/best_move', { signal: controller.signal })
                 .then(response => response.json())
                 .then(data => {
+                    clearTimeout(timeoutId);
                     stopTimer();
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
                     timerElement.textContent = elapsed + 's';
@@ -451,6 +464,17 @@
                         document.getElementById('best-moves').innerHTML = 'Game is over!';
                         document.getElementById('best-moves').classList.add('show');
                     }
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    stopTimer();
+                    document.getElementById('loading').classList.remove('show');
+                    if (error.name === 'AbortError') {
+                        document.getElementById('best-moves').innerHTML = '⚠️ Analysis stopped after 60 seconds. Please try again.';
+                    } else {
+                        document.getElementById('best-moves').innerHTML = '❌ Error analyzing position. Please try again.';
+                    }
+                    document.getElementById('best-moves').classList.add('show');
                 });
         }
         
