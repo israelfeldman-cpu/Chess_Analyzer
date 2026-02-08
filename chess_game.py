@@ -76,7 +76,12 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        result = self.engine.analyse(self.board, chess.engine.Limit(depth=5, nodes=50000), multipv=1)
+        # Very aggressive limits to ensure fast response
+        result = self.engine.analyse(
+            self.board, 
+            chess.engine.Limit(time=5.0, depth=6, nodes=100000),
+            multipv=1
+        )
         
         best_moves = []
         for info in result:
@@ -104,9 +109,9 @@ class ChessGame:
             return None
         
         if difficulty == 'easy':
-            result = self.engine.play(self.board, chess.engine.Limit(depth=3, nodes=10000))
+            result = self.engine.play(self.board, chess.engine.Limit(time=1.0, depth=4, nodes=20000))
         else:
-            result = self.engine.play(self.board, chess.engine.Limit(depth=5, nodes=50000))
+            result = self.engine.play(self.board, chess.engine.Limit(time=3.0, depth=6, nodes=100000))
         
         return result.move
     
