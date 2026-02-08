@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Chess Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .game-wrapper {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .board-container {
+            position: relative;
+        }
+        
+        #chess-board {
+            border: 3px solid #333;
+            border-radius: 5px;
+            user-select: none;
+            cursor: pointer;
+        }
+        
+        .controls {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .turn-indicator {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .status {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .move-history {
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        
+        .move-history span {
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .best-moves {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .best-moves.show {
+            display: block;
+        }
+        
+        .move-option {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .move-option:hover {
+            background: #e9ecef;
+        }
+        
+        .move-option strong {
+            color: #667eea;
+        }
+        
+        .move-option .eval {
+            color: #27ae60;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            padding: 15px;
+            display: none;
+            font-size: 16px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .timer {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .timer-text {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .instruction {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #1976d2;
+            border: 2px solid #90caf9;
+        }
+        
+        @media (max-width: 768px) {
+            .game-wrapper {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>♔ Interactive Chess Game ♚</h1>
+        
+        <div class="game-wrapper">
+            <div class="board-container">
+                <div id="chess-board"></div>
+            </div>
+            
+            <div class="controls">
+                <div class="instruction">
+                    <strong>🖱️ How to play:</strong><br>
+                    1️⃣ Click on a piece to select it<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;→ Yellow highlight = selected<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;→ Green highlights = legal moves<br>
+                    2️⃣ Click destination square to move<br>
+                    <label style="margin-top: 10px; display: block;">
+                        <input type="checkbox" id="auto-play" onchange="toggleAutoPlay()">
+                        <strong>Auto-play: Computer responds automatically</strong>
+                    </label>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Game Status</h3>
+                    <div class="turn-indicator">Turn: <span id="turn">White</span></div>
+                    <div class="status" id="status"></div>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Move History</h3>
+                    <div class="move-history" id="history">No moves yet</div>
+                </div>
+                
+                <div class="buttons">
+                    <button class="btn-primary" id="computer-easy-btn" onclick="computerMove('easy')" style="background: #27ae60;">
+                        🎯 Easy Bot (Fast)
+                    </button>
+                    <button class="btn-primary" id="computer-normal-btn" onclick="computerMove('normal')">
+                        🤖 Strong Bot
+                    </button>
+                    <button class="btn-primary" id="best-move-btn" onclick="getBestMove()">
+                        🤔 Show Best Moves
+                    </button>
+                    <button class="btn-secondary" onclick="undoMove()">
+                        ↩️ Undo Move
+                    </button>
+                    <button class="btn-secondary" onclick="resetGame()">
+                        🔄 New Game
+                    </button>
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="timer-text">⏱️ Analyzing position...</div>
+                    <div class="timer" id="timer">0s</div>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Best Moves</h3>
+                    <div class="best-moves" id="best-moves">
+                        Click "Show Best Moves" to analyze
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedSquare = null;
+        let legalMoves = [];
+        let autoPlay = false;
+        let timerInterval = null;
+        
+        function toggleAutoPlay() {
+            autoPlay = document.getElementById('auto-play').checked;
+            if (autoPlay && document.getElementById('turn').textContent === 'Black') {
+                setTimeout(() => computerMove(), 500);
+            }
+        }
+        
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+        
+        function loadBoard() {
+            fetch('/board')
+                .then(response => response.text())
+                .then(svg => {
+                    document.getElementById('chess-board').innerHTML = svg;
+                    attachBoardListener();
+                });
+        }
+        
+        function attachBoardListener() {
+            const board = document.getElementById('chess-board');
+            const svg = board.querySelector('svg');
+            
+            svg.addEventListener('click', function(event) {
+                const rect = svg.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                
+                const squareSize = rect.width / 8;
+                
+                const col = Math.floor(x / squareSize);
+                const row = 7 - Math.floor(y / squareSize);
+                
+                if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+                    const squareName = String.fromCharCode(97 + col) + (row + 1);
+                    console.log('Clicked:', squareName, 'at', col, row);
+                    handleSquareClick(squareName);
+                }
+            });
+        }
+        
+        function handleSquareClick(squareName) {
+            if (selectedSquare === null) {
+                selectedSquare = squareName;
+                highlightLegalMoves(squareName);
+            } else {
+                if (legalMoves.includes(squareName)) {
+                    makeMove(selectedSquare + squareName);
+                    selectedSquare = null;
+                    legalMoves = [];
+                } else {
+                    selectedSquare = squareName;
+                    highlightLegalMoves(squareName);
+                }
+            }
+        }
+        
+        function highlightLegalMoves(square) {
+            fetch('/legal_moves', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({square: square})
+            })
+            .then(response => response.json())
+            .then(data => {
+                legalMoves = data.moves;
+                document.getElementById('chess-board').innerHTML = data.board;
+                attachBoardListener();
+            });
+        }
+        
+        function makeMove(moveUci) {
+            fetch('/move', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({move: moveUci})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('chess-board').innerHTML = data.board;
+                    attachBoardListener();
+                    updateGameInfo(data);
+                    document.getElementById('best-moves').classList.remove('show');
+                    
+                    if (autoPlay && data.turn === 'Black' && !data.game_over) {
+                        setTimeout(() => computerMove(), 500);
+                    }
+                } else {
+                    console.error('Invalid move:', data.error);
+                    loadBoard();
+                }
+            });
+        }
+        
+        function updateGameInfo(data) {
+            document.getElementById('turn').textContent = data.turn;
+            document.getElementById('status').textContent = data.status;
+            
+            if (data.history && data.history.length > 0) {
+                const historyHTML = data.history.map((move, i) => {
+                    const moveNum = Math.floor(i / 2) + 1;
+                    if (i % 2 === 0) {
+                        return `<span><strong>${moveNum}.</strong> ${move}</span>`;
+                    } else {
+                        return `<span>${move}</span>`;
+                    }
+                }).join(' ');
+                document.getElementById('history').innerHTML = historyHTML;
+            }
+            
+            document.getElementById('best-move-btn').disabled = data.game_over;
+        }
+        
+        function getBestMove() {
+            stopTimer();
+            
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('best-moves').classList.remove('show');
+            
+            let seconds = 0;
+            const timerElement = document.getElementById('timer');
+            timerElement.textContent = '0s';
+            
+            timerInterval = setInterval(() => {
+                seconds++;
+                timerElement.textContent = seconds + 's';
+            }, 1000);
+            
+            const startTime = Date.now();
+            
+            fetch('/best_move')
+                .then(response => response.json())
+                .then(data => {
+                    stopTimer();
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    timerElement.textContent = elapsed + 's';
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading').classList.remove('show');
+                    }, 1000);
+                    
+                    if (data.success) {
+                        const movesHTML = data.moves.map((m, i) => `
+                            <div class="move-option" onclick="makeMove('${m.uci}')">
+                                <strong>${i + 1}.</strong>
+                                <span class="eval">${m.eval}</span>
+                                ${m.move}
+                                <div style="font-size: 12px; color: #666; margin-top: 3px;">${m.line}</div>
+                            </div>
+                        `).join('');
+                        
+                        document.getElementById('best-moves').innerHTML = movesHTML;
+                        document.getElementById('best-moves').classList.add('show');
+                    } else {
+                        document.getElementById('best-moves').innerHTML = 'Game is over!';
+                        document.getElementById('best-moves').classList.add('show');
+                    }
+                });
+        }
+        
+        function resetGame() {
+            stopTimer();
+            
+            fetch('/reset', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('chess-board').innerHTML = data.board;
+                    attachBoardListener();
+                    document.getElementById('turn').textContent = data.turn;
+                    document.getElementById('status').textContent = '';
+                    document.getElementById('history').textContent = 'No moves yet';
+                    document.getElementById('best-moves').classList.remove('show');
+                    document.getElementById('loading').classList.remove('show');
+                    document.getElementById('best-move-btn').disabled = false;
+                    selectedSquare = null;
+                    legalMoves = [];
+                });
+        }
+        
+        function undoMove() {
+            fetch('/undo', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('chess-board').innerHTML = data.board;
+                        attachBoardListener();
+                        document.getElementById('turn').textContent = data.turn;
+                        document.getElementById('status').textContent = data.status;
+                        
+                        if (data.history && data.history.length > 0) {
+                            const historyHTML = data.history.map((move, i) => {
+                                const moveNum = Math.floor(i / 2) + 1;
+                                if (i % 2 === 0) {
+                                    return `<span><strong>${moveNum}.</strong> ${move}</span>`;
+                                } else {
+                                    return `<span>${move}</span>`;
+                                }
+                            }).join(' ');
+                            document.getElementById('history').innerHTML = historyHTML;
+                        } else {
+                            document.getElementById('history').textContent = 'No moves yet';
+                        }
+                        
+                        document.getElementById('best-moves').classList.remove('show');
+                        document.getElementById('best-move-btn').disabled = data.game_over;
+                        selectedSquare = null;
+                        legalMoves = [];
+                    } else {
+                        console.log('Cannot undo:', data.error);
+                    }
+                });
+        }
+        
+        function computerMove(difficulty = 'normal') {
+            const btnId = difficulty === 'easy' ? 'computer-easy-btn' : 'computer-normal-btn';
+            const btn = document.getElementById(btnId);
+            const originalText = btn.textContent;
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Thinking...';
+            
+            fetch('/computer_move', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({difficulty: difficulty})
+            })
+                .then(response => response.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    
+                    if (data.success) {
+                        document.getElementById('chess-board').innerHTML = data.board;
+                        attachBoardListener();
+                        updateGameInfo(data);
+                        document.getElementById('best-moves').classList.remove('show');
+                        selectedSquare = null;
+                        legalMoves = [];
+                    } else {
+                        console.log('Computer cannot move:', data.error);
+                    }
+                });
+        }
+        
+        loadBoard();
+    </script>
+</body>
+</html>
