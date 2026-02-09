@@ -79,10 +79,10 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Very aggressive limits - prioritize speed over depth
+        # 60 second time limit, remove depth constraint for better results
         result = self.engine.analyse(
             self.board, 
-            chess.engine.Limit(time=3.0, depth=5, nodes=50000),
+            chess.engine.Limit(time=60.0),
             multipv=1
         )
         
