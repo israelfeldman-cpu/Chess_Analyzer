@@ -111,9 +111,11 @@ class ChessGame:
             return None
         
         if difficulty == 'easy':
-            result = self.engine.play(self.board, chess.engine.Limit(time=0.5, depth=3, nodes=10000))
+            # Super fast - immediate response
+            result = self.engine.play(self.board, chess.engine.Limit(time=0.3, depth=2, nodes=5000))
         else:
-            result = self.engine.play(self.board, chess.engine.Limit(time=1.5, depth=5, nodes=50000))
+            # Fast but still decent
+            result = self.engine.play(self.board, chess.engine.Limit(time=0.8, depth=4, nodes=30000))
         
         return result.move
     
