@@ -75,14 +75,14 @@ class ChessGame:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
-    def get_best_move(self):
+    def get_best_move(self, time_limit=60.0):
         if self.board.is_game_over():
             return None
         
-        # 60 second time limit, remove depth constraint for better results
+        # Use user-specified time limit
         result = self.engine.analyse(
             self.board, 
-            chess.engine.Limit(time=60.0),
+            chess.engine.Limit(time=time_limit),
             multipv=1
         )
         
@@ -276,7 +276,10 @@ def best_move():
     if 'game_state' in session:
         game.set_state(session['game_state'])
     
-    best_moves = game.get_best_move()
+    # Get time_limit from query parameter, default to 60 seconds
+    time_limit = float(request.args.get('time_limit', 60.0))
+    
+    best_moves = game.get_best_move(time_limit)
     if best_moves:
         return jsonify({
             'success': True,

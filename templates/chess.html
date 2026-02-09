@@ -268,6 +268,15 @@
                     </button>
                 </div>
                 
+                <div class="info-box">
+                    <h3>Analysis Time Limit</h3>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                        <input type="range" id="time-limit-slider" min="1" max="30" value="1" step="1" 
+                               style="flex: 1;" oninput="updateTimeLimit(this.value)">
+                        <span id="time-limit-display" style="font-weight: bold; min-width: 70px;">1 min</span>
+                    </div>
+                </div>
+                
                 <div class="loading" id="loading">
                     <div class="timer-text">⏱️ Analyzing position...</div>
                     <div class="timer" id="timer">0s</div>
@@ -288,6 +297,13 @@
         let legalMoves = [];
         let autoPlay = false;
         let timerInterval = null;
+        let analysisTimeLimit = 60; // Default 1 minute (60 seconds)
+        
+        function updateTimeLimit(minutes) {
+            analysisTimeLimit = parseInt(minutes) * 60; // Convert minutes to seconds
+            const displayText = minutes == 1 ? '1 min' : minutes + ' mins';
+            document.getElementById('time-limit-display').textContent = displayText;
+        }
         
         function toggleAutoPlay() {
             autoPlay = document.getElementById('auto-play').checked;
@@ -418,13 +434,14 @@
             timerElement.textContent = '0s';
             
             const startTime = Date.now();
+            const timeoutMs = analysisTimeLimit * 1000; // Use user-selected time limit
             
             timerInterval = setInterval(() => {
                 seconds++;
                 timerElement.textContent = seconds + 's';
                 
-                // Force stop after 60 seconds
-                if (seconds >= 60) {
+                // Force stop when time limit is reached
+                if (seconds >= analysisTimeLimit) {
                     stopTimer();
                     document.getElementById('loading').classList.remove('show');
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -435,9 +452,9 @@
             
             // Create AbortController for timeout
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs); // User-selected timeout
             
-            fetch('/best_move', { signal: controller.signal })
+            fetch('/best_move?time_limit=' + analysisTimeLimit, { signal: controller.signal })
                 .then(response => response.json())
                 .then(data => {
                     clearTimeout(timeoutId);
