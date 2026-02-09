@@ -7,6 +7,7 @@ import webbrowser
 import threading
 import time
 import os
+from version import __version__
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'chess-game-secret-key-change-in-production')
@@ -211,7 +212,11 @@ def index():
     # Load game state from session if it exists
     if 'game_state' in session:
         game.set_state(session['game_state'])
-    return render_template('chess.html')
+    return render_template('chess.html', version=__version__)
+
+@app.route('/version')
+def version():
+    return jsonify({'version': __version__})
 
 @app.route('/board')
 def get_board():
