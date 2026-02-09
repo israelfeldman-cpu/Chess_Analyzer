@@ -417,6 +417,8 @@
             const timerElement = document.getElementById('timer');
             timerElement.textContent = '0s';
             
+            const startTime = Date.now();
+            
             timerInterval = setInterval(() => {
                 seconds++;
                 timerElement.textContent = seconds + 's';
@@ -425,12 +427,11 @@
                 if (seconds >= 60) {
                     stopTimer();
                     document.getElementById('loading').classList.remove('show');
-                    document.getElementById('best-moves').innerHTML = '⏱️ The Analysis of best move Stopped! Time limit exceeded.';
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    document.getElementById('best-moves').innerHTML = `⏱️ Time limit exceeded (${elapsed}s)`;
                     document.getElementById('best-moves').classList.add('show');
                 }
             }, 1000);
-            
-            const startTime = Date.now();
             
             // Create AbortController for timeout
             const controller = new AbortController();
@@ -468,8 +469,9 @@
                 .catch(error => {
                     clearTimeout(timeoutId);
                     stopTimer();
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
                     document.getElementById('loading').classList.remove('show');
-                    document.getElementById('best-moves').innerHTML = '⏱️ The Analysis of best move Stopped! Time limit exceeded.';
+                    document.getElementById('best-moves').innerHTML = `⏱️ Time limit exceeded (${elapsed}s)`;
                     document.getElementById('best-moves').classList.add('show');
                 });
         }
@@ -522,8 +524,12 @@
                         selectedSquare = null;
                         legalMoves = [];
                     } else {
-                        console.log('Cannot undo:', data.error);
+                        alert('Cannot undo: ' + (data.error || 'Unknown error'));
                     }
+                })
+                .catch(error => {
+                    console.error('Undo error:', error);
+                    alert('Undo failed: ' + error.message);
                 });
         }
         
@@ -533,7 +539,15 @@
             const originalText = btn.textContent;
             
             btn.disabled = true;
-            btn.textContent = '⏳ Thinking...';
+            
+            // Add timer to button
+            let botSeconds = 0;
+            const botTimerInterval = setInterval(() => {
+                botSeconds++;
+                btn.textContent = `⏳ Thinking... ${botSeconds}s`;
+            }, 1000);
+            
+            const startTime = Date.now();
             
             fetch('/computer_move', {
                 method: 'POST',
@@ -542,8 +556,14 @@
             })
                 .then(response => response.json())
                 .then(data => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
+                    clearInterval(botTimerInterval);
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    btn.textContent = `✓ ${elapsed}s`;
+                    
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }, 1000);
                     
                     if (data.success) {
                         document.getElementById('chess-board').innerHTML = data.board;
@@ -555,6 +575,12 @@
                     } else {
                         console.log('Computer cannot move:', data.error);
                     }
+                })
+                .catch(error => {
+                    clearInterval(botTimerInterval);
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    console.error('Bot error:', error);
                 });
         }
         

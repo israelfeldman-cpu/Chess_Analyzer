@@ -112,11 +112,11 @@ class ChessGame:
             return None
         
         if difficulty == 'easy':
-            # Super fast - immediate response
-            result = self.engine.play(self.board, chess.engine.Limit(time=0.3, depth=2, nodes=5000))
+            # Ultra-fast - immediate response (0.1-0.3s)
+            result = self.engine.play(self.board, chess.engine.Limit(time=0.1, nodes=1000))
         else:
-            # Fast but still decent
-            result = self.engine.play(self.board, chess.engine.Limit(time=0.8, depth=4, nodes=30000))
+            # Fast - under 1 second (0.3-0.8s)
+            result = self.engine.play(self.board, chess.engine.Limit(time=0.3, nodes=5000))
         
         return result.move
     
@@ -166,13 +166,22 @@ class ChessGame:
         """Get current game state for session storage"""
         return {
             'fen': self.board.fen(),
-            'history': self.move_history
+            'history': self.move_history,
+            'moves_uci': [move.uci() for move in self.board.move_stack]
         }
     
     def set_state(self, state):
         """Restore game state from session"""
-        if state and 'fen' in state:
-            self.board.set_fen(state['fen'])
+        if state:
+            # Restore from move list if available (preserves full move stack)
+            if 'moves_uci' in state and state['moves_uci']:
+                self.board.reset()
+                for move_uci in state['moves_uci']:
+                    self.board.push(chess.Move.from_uci(move_uci))
+            elif 'fen' in state:
+                # Fallback to FEN (loses move stack)
+                self.board.set_fen(state['fen'])
+            
             self.move_history = state.get('history', [])
     
     def close(self):
