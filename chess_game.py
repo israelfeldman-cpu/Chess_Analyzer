@@ -92,7 +92,13 @@ class ChessGame:
         )
         
         best_moves = []
-        for info in result:
+        # result is a list when multipv > 1, or single dict when multipv = 1
+        if isinstance(result, list):
+            infos = result
+        else:
+            infos = [result]
+            
+        for info in infos:
             score = info["score"].relative
             pv = info["pv"]
             
