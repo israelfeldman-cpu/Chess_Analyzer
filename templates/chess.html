@@ -320,11 +320,30 @@
         }
         
         function loadBoard() {
-            fetch('/board')
-                .then(response => response.text())
-                .then(svg => {
-                    document.getElementById('chess-board').innerHTML = svg;
+            fetch('/game_state')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('chess-board').innerHTML = data.board;
                     attachBoardListener();
+                    document.getElementById('turn').textContent = data.turn;
+                    document.getElementById('status').textContent = data.status;
+                    
+                    // Load move history
+                    if (data.history && data.history.length > 0) {
+                        const historyHTML = data.history.map((move, i) => {
+                            const moveNum = Math.floor(i / 2) + 1;
+                            if (i % 2 === 0) {
+                                return `<span><strong>${moveNum}.</strong> ${move}</span>`;
+                            } else {
+                                return `<span>${move}</span>`;
+                            }
+                        }).join(' ');
+                        document.getElementById('history').innerHTML = historyHTML;
+                    } else {
+                        document.getElementById('history').textContent = 'No moves yet';
+                    }
+                    
+                    document.getElementById('best-move-btn').disabled = data.game_over;
                 });
         }
         
@@ -434,25 +453,17 @@
             timerElement.textContent = '0s';
             
             const startTime = Date.now();
-            const timeoutMs = analysisTimeLimit * 1000; // Use user-selected time limit
+            // Add 10-second buffer for server overhead
+            const timeoutMs = (analysisTimeLimit + 10) * 1000;
             
             timerInterval = setInterval(() => {
                 seconds++;
                 timerElement.textContent = seconds + 's';
-                
-                // Force stop when time limit is reached
-                if (seconds >= analysisTimeLimit) {
-                    stopTimer();
-                    document.getElementById('loading').classList.remove('show');
-                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                    document.getElementById('best-moves').innerHTML = `⏱️ Time limit exceeded (${elapsed}s)`;
-                    document.getElementById('best-moves').classList.add('show');
-                }
             }, 1000);
             
-            // Create AbortController for timeout
+            // Create AbortController for timeout (with buffer)
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs); // User-selected timeout
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             
             console.log('Fetching best move with time limit:', analysisTimeLimit, 'seconds');
             fetch('/best_move?time_limit=' + analysisTimeLimit, { signal: controller.signal })

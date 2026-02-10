@@ -236,6 +236,20 @@ def index():
 def version():
     return jsonify({'version': __version__})
 
+@app.route('/game_state')
+def game_state():
+    # Load game state from session
+    if 'game_state' in session:
+        game.set_state(session['game_state'])
+    
+    return jsonify({
+        'board': game.get_board_svg(),
+        'history': game.move_history,
+        'turn': 'White' if game.board.turn else 'Black',
+        'status': game.get_game_status(),
+        'game_over': game.board.is_game_over()
+    })
+
 @app.route('/board')
 def get_board():
     # Load game state from session
