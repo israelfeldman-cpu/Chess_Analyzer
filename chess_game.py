@@ -83,22 +83,20 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Use both time limit and depth for faster results
-        # Depth 20 is strong but much faster than unlimited depth
+        # Use only time limit for predictable results
+        # Removed depth to avoid format inconsistency
         result = self.engine.analyse(
             self.board, 
-            chess.engine.Limit(time=time_limit, depth=20),
+            chess.engine.Limit(time=time_limit),
             multipv=1
         )
         
         best_moves = []
-        # result is a list when multipv > 1, or single dict when multipv = 1
-        if isinstance(result, list):
-            infos = result
-        else:
-            infos = [result]
+        # When multipv=1, result is a single info dict, not a list
+        if not isinstance(result, list):
+            result = [result]
             
-        for info in infos:
+        for info in result:
             score = info["score"].relative
             pv = info["pv"]
             

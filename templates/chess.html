@@ -454,9 +454,14 @@
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs); // User-selected timeout
             
+            console.log('Fetching best move with time limit:', analysisTimeLimit, 'seconds');
             fetch('/best_move?time_limit=' + analysisTimeLimit, { signal: controller.signal })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response received:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Data received:', data);
                     clearTimeout(timeoutId);
                     stopTimer();
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -484,6 +489,7 @@
                     }
                 })
                 .catch(error => {
+                    console.error('Fetch error:', error);
                     clearTimeout(timeoutId);
                     stopTimer();
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
