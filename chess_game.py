@@ -196,6 +196,14 @@ class ChessGame:
         self.engine.quit()
 
 def find_stockfish():
+    import os
+    print("=" * 60)
+    print("Searching for Stockfish...")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Directory contents: {os.listdir('.')}")
+    if os.path.exists('stockfish'):
+        print(f"Stockfish dir contents: {os.listdir('stockfish')}")
+    
     common_paths = [
         "stockfish/stockfish-windows-x86-64-avx2.exe",
         "stockfish.exe",
@@ -209,8 +217,13 @@ def find_stockfish():
     
     for path in common_paths:
         path_obj = Path(path)
+        print(f"  Checking: {path} ... ", end="")
         if path_obj.exists() and path_obj.is_file():
+            print(f"✓ FOUND")
             return str(path)
+        print("✗ not found")
+    
+    print("=" * 60)
     return None
 
 stockfish_path = find_stockfish()
