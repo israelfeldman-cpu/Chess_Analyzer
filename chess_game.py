@@ -83,8 +83,10 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
+        # Cap at 20 seconds for web deployment (Render has 30s timeout)
+        time_limit = min(time_limit, 20.0)
+        
         # Use only time limit for predictable results
-        # Removed depth to avoid format inconsistency
         result = self.engine.analyse(
             self.board, 
             chess.engine.Limit(time=time_limit),
