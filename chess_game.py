@@ -16,6 +16,10 @@ class ChessGame:
     def __init__(self, stockfish_path):
         self.board = chess.Board()
         self.engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+        
+        # Optimize Stockfish for speed
+        self.engine.configure({"Threads": 2, "Hash": 128, "Skill Level": 15})
+        
         self.move_history = []
     
     def get_board_svg(self, selected_square=None, legal_moves=None):
@@ -79,10 +83,11 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Use user-specified time limit
+        # Use both time limit and depth for faster results
+        # Depth 20 is strong but much faster than unlimited depth
         result = self.engine.analyse(
             self.board, 
-            chess.engine.Limit(time=time_limit),
+            chess.engine.Limit(time=time_limit, depth=20),
             multipv=1
         )
         
