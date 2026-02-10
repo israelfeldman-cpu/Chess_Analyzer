@@ -482,7 +482,8 @@
                         document.getElementById('loading').classList.remove('show');
                     }, 1000);
                     
-                    if (data.success) {
+                    if (data.success && data.moves && Array.isArray(data.moves)) {
+                        console.log('Processing moves:', data.moves);
                         const movesHTML = data.moves.map((m, i) => `
                             <div class="move-option" onclick="makeMove('${m.uci}')">
                                 <strong>${i + 1}.</strong>
@@ -492,9 +493,11 @@
                             </div>
                         `).join('');
                         
+                        console.log('Moves HTML created, displaying...');
                         document.getElementById('best-moves').innerHTML = movesHTML;
                         document.getElementById('best-moves').classList.add('show');
                     } else {
+                        console.log('No moves or game over');
                         document.getElementById('best-moves').innerHTML = 'Game is over!';
                         document.getElementById('best-moves').classList.add('show');
                     }
