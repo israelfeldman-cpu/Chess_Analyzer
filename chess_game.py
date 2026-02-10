@@ -350,32 +350,41 @@ def undo():
 
 @app.route('/computer_move', methods=['POST'])
 def computer_move():
-    # Load game state from session
-    if 'game_state' in session:
-        game.set_state(session['game_state'])
-    
-    data = request.json
-    difficulty = data.get('difficulty', 'normal') if data else 'normal'
-    
-    move = game.get_computer_move(difficulty)
-    if move:
-        san = game.board.san(move)
-        game.board.push(move)
-        game.move_history.append(san)
+    try:
+        # Load game state from session
+        if 'game_state' in session:
+            game.set_state(session['game_state'])
         
-        # Save updated state
-        session['game_state'] = game.get_state()
+        data = request.json
+        difficulty = data.get('difficulty', 'normal') if data else 'normal'
         
-        return jsonify({
-            'success': True,
-            'move': san,
-            'board': game.get_board_svg(),
-            'status': game.get_game_status(),
-            'history': game.move_history,
-            'turn': 'White' if game.board.turn else 'Black',
-            'game_over': game.board.is_game_over()
-        })
-    return jsonify({'success': False, 'error': 'Game is over'})
+        print(f"Computer move requested: difficulty={difficulty}")
+        move = game.get_computer_move(difficulty)
+        
+        if move:
+            san = game.board.san(move)
+            game.board.push(move)
+            game.move_history.append(san)
+            
+            # Save updated state
+            session['game_state'] = game.get_state()
+            
+            print(f"Computer played: {san}")
+            return jsonify({
+                'success': True,
+                'move': san,
+                'board': game.get_board_svg(),
+                'status': game.get_game_status(),
+                'history': game.move_history,
+                'turn': 'White' if game.board.turn else 'Black',
+                'game_over': game.board.is_game_over()
+            })
+        return jsonify({'success': False, 'error': 'Game is over'})
+    except Exception as e:
+        print(f"Computer move error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def open_browser():
     time.sleep(1)
