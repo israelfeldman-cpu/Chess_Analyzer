@@ -172,25 +172,54 @@ class ChessGame:
     
     def get_state(self):
         """Get current game state for session storage"""
-        return {
+        state = {
             'fen': self.board.fen(),
             'history': self.move_history,
             'moves_uci': [move.uci() for move in self.board.move_stack]
         }
+        print(f"Saving state - FEN: {state['fen']}, moves: {len(state['moves_uci'])}")
+        return state
     
     def set_state(self, state):
         """Restore game state from session"""
         if state:
-            # Restore from move list if available (preserves full move stack)
-            if 'moves_uci' in state and state['moves_uci']:
+            print(f"Loading state - FEN: {state.get('fen', 'none')}, moves: {len(state.get('moves_uci', []))}")
+            try:
+                # Validate the FEN first if present
+                if 'fen' in state:
+                    try:
+                        # Test if FEN is valid
+                        test_board = chess.Board(state['fen'])
+                    except ValueError as ve:
+                        print(f"Warning: Corrupted FEN detected: {state['fen']}, error: {ve}")
+                        print("Resetting to initial position...")
+                        self.board.reset()
+                        self.move_history = []
+                        return
+                
+                # Restore from move list if available (preserves full move stack)
+                if 'moves_uci' in state and state['moves_uci']:
+                    self.board.reset()
+                    for move_uci in state['moves_uci']:
+                        try:
+                            move = chess.Move.from_uci(move_uci)
+                            if move in self.board.legal_moves:
+                                self.board.push(move)
+                            else:
+                                print(f"Warning: Illegal move in state: {move_uci}")
+                                break
+                        except ValueError as e:
+                            print(f"Warning: Invalid UCI move: {move_uci}, error: {e}")
+                            break
+                elif 'fen' in state:
+                    # Fallback to FEN (loses move stack)
+                    self.board.set_fen(state['fen'])
+                
+                self.move_history = state.get('history', [])
+            except Exception as e:
+                print(f"Error restoring state: {e}, resetting to initial position")
                 self.board.reset()
-                for move_uci in state['moves_uci']:
-                    self.board.push(chess.Move.from_uci(move_uci))
-            elif 'fen' in state:
-                # Fallback to FEN (loses move stack)
-                self.board.set_fen(state['fen'])
-            
-            self.move_history = state.get('history', [])
+                self.move_history = []
     
     def close(self):
         self.engine.quit()
@@ -307,20 +336,29 @@ def legal_moves():
 
 @app.route('/best_move', methods=['GET'])
 def best_move():
-    # Load game state from session
-    if 'game_state' in session:
-        game.set_state(session['game_state'])
-    
-    # Get time_limit from query parameter, default to 60 seconds
-    time_limit = float(request.args.get('time_limit', 60.0))
-    
-    best_moves = game.get_best_move(time_limit)
-    if best_moves:
-        return jsonify({
-            'success': True,
-            'moves': best_moves
-        })
-    return jsonify({'success': False, 'error': 'Game is over'})
+    try:
+        # Load game state from session
+        if 'game_state' in session:
+            game.set_state(session['game_state'])
+        
+        # Get time_limit from query parameter, default to 60 seconds
+        time_limit = float(request.args.get('time_limit', 60.0))
+        
+        print(f"Best move analysis requested: time_limit={time_limit}s")
+        best_moves = game.get_best_move(time_limit)
+        
+        if best_moves:
+            print(f"Best move found: {best_moves[0] if best_moves else 'none'}")
+            return jsonify({
+                'success': True,
+                'moves': best_moves
+            })
+        return jsonify({'success': False, 'error': 'Game is over'})
+    except Exception as e:
+        print(f"Best move analysis error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Analysis failed: {str(e)}'}), 500
 
 @app.route('/reset', methods=['POST'])
 def reset():
