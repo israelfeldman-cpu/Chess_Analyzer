@@ -83,9 +83,9 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Cap at 40 seconds to fit within Render's ~70s HTTP timeout
-        # (leaving ~30s buffer for network overhead and response processing)
-        time_limit = min(time_limit, 40.0)
+        # Cap at 30 seconds to ensure completion well within Render's timeout
+        # Total time including overhead should be ~35-40 seconds
+        time_limit = min(time_limit, 30.0)
         
         # Use only time limit for predictable results
         result = self.engine.analyse(
