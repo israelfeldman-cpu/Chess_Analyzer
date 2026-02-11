@@ -83,9 +83,13 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Cap at 30 seconds to ensure completion well within Render's timeout
-        # Total time including overhead should be ~35-40 seconds
-        time_limit = min(time_limit, 30.0)
+        # Only cap timeout on Render deployment (not locally)
+        # Check if running on Render by looking for RENDER environment variable
+        import os
+        if os.environ.get('RENDER'):
+            # Cap at 30 seconds for Render's ~70s HTTP timeout
+            time_limit = min(time_limit, 30.0)
+        # Locally: use full time_limit from slider (1-30 minutes)
         
         # Use only time limit for predictable results
         result = self.engine.analyse(
