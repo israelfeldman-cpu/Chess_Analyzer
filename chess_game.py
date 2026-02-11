@@ -121,13 +121,19 @@ class ChessGame:
         
         try:
             if difficulty == 'easy':
-                # Ultra-fast - immediate response (0.1-0.3s)
-                result = self.engine.play(self.board, chess.engine.Limit(time=0.1, nodes=1000))
+                # Ultra-fast - immediate response (under 0.1s)
+                result = self.engine.play(self.board, chess.engine.Limit(time=0.05, nodes=500))
             else:
-                # Fast - under 1 second (0.3-0.8s)
-                result = self.engine.play(self.board, chess.engine.Limit(time=0.3, nodes=5000))
+                # Fast - under 0.3 second
+                result = self.engine.play(self.board, chess.engine.Limit(time=0.2, nodes=2000))
             
-            return result.move
+            if result and result.move:
+                return result.move
+            else:
+                # Fallback to random move
+                import random
+                legal_moves = list(self.board.legal_moves)
+                return random.choice(legal_moves) if legal_moves else None
         except Exception as e:
             print(f"Stockfish error in get_computer_move: {e}")
             # Fallback: return a random legal move
