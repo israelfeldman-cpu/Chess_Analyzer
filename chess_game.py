@@ -87,8 +87,8 @@ class ChessGame:
         # Check if running on Render by looking for RENDER environment variable
         import os
         if os.environ.get('RENDER'):
-            # Cap at 30 seconds for Render's ~70s HTTP timeout
-            time_limit = min(time_limit, 30.0)
+            # Cap at 20 seconds for Render's 70s HTTP timeout (with buffer)
+            time_limit = min(time_limit, 20.0)
         # Locally: use full time_limit from slider (1-30 minutes)
         
         # Use only time limit for predictable results
