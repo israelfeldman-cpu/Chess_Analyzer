@@ -124,17 +124,31 @@ class ChessGame:
         return best_moves
     
     def get_computer_move(self, difficulty='normal'):
-        """Get computer move - returns immediately with random move as fallback"""
+        """Get computer move using Stockfish"""
         if self.board.is_game_over():
             return None
         
-        # Immediate fallback: return a random legal move
-        # Stockfish is not working reliably on Render deployment
-        import random
-        legal_moves = list(self.board.legal_moves)
-        if legal_moves:
-            return random.choice(legal_moves)
-        return None
+        try:
+            if difficulty == 'easy':
+                # Easy: Depth 5, ~0.5 seconds (beginner level ~1200 ELO)
+                result = self.engine.play(self.board, chess.engine.Limit(depth=5, time=0.5))
+            else:
+                # Strong: Depth 10, ~2 seconds (intermediate level ~1800 ELO)
+                result = self.engine.play(self.board, chess.engine.Limit(depth=10, time=2.0))
+            
+            if result and result.move:
+                return result.move
+            else:
+                # Fallback to random move if Stockfish fails
+                import random
+                legal_moves = list(self.board.legal_moves)
+                return random.choice(legal_moves) if legal_moves else None
+        except Exception as e:
+            print(f"Stockfish error in get_computer_move: {e}")
+            # Fallback: return a random legal move
+            import random
+            legal_moves = list(self.board.legal_moves)
+            return random.choice(legal_moves) if legal_moves else None
     
     def get_legal_moves(self, from_square):
         try:
