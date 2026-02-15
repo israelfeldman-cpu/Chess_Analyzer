@@ -149,44 +149,75 @@ class ChessGame:
         return self._get_simple_move(difficulty)
     
     def _get_simple_move(self, difficulty='normal'):
-        """Fast move selection using simple piece values"""
+        """Fast move selection using piece-square tables and tactical evaluation"""
         import random
         
         legal_moves = list(self.board.legal_moves)
         if not legal_moves:
             return None
         
+        # Piece values
+        piece_values = {
+            chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330, 
+            chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 20000
+        }
+        
         # Score each move
         move_scores = []
         for move in legal_moves:
             score = 0
+            moving_piece = self.board.piece_at(move.from_square)
             
-            # Captures are good
+            # Captures - value based on victim minus attacker value difference
             if self.board.is_capture(move):
                 captured_piece = self.board.piece_at(move.to_square)
-                if captured_piece:
-                    piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, 
-                                   chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
-                    score += piece_values.get(captured_piece.piece_type, 0) * 10
+                if captured_piece and moving_piece:
+                    victim_value = piece_values.get(captured_piece.piece_type, 0)
+                    attacker_value = piece_values.get(moving_piece.piece_type, 0)
+                    # MVV-LVA: Most Valuable Victim - Least Valuable Attacker
+                    score += victim_value * 10 - attacker_value // 10
             
-            # Checks are good
+            # Make the move to evaluate position
             self.board.push(move)
+            
+            # Checks are valuable
             if self.board.is_check():
-                score += 5
+                score += 50
+            
+            # Checkmate is best
+            if self.board.is_checkmate():
+                score += 100000
+            
+            # Avoid moves that lose material
+            # Check if this square is attacked after moving
+            if self.board.is_attacked_by(not self.board.turn, move.to_square):
+                if moving_piece:
+                    score -= piece_values.get(moving_piece.piece_type, 0) // 2
+            
+            # Center control bonus
+            center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
+            if move.to_square in center_squares:
+                score += 20
+            
+            # Development bonus in opening (first 10 moves)
+            if len(self.board.move_stack) < 10:
+                if moving_piece and moving_piece.piece_type in [chess.KNIGHT, chess.BISHOP]:
+                    score += 15
+            
             self.board.pop()
             
-            # Add some randomness for Easy mode
+            # Add randomness for Easy mode
             if difficulty == 'easy':
-                score += random.randint(-10, 10)
+                score += random.randint(-30, 30)
             
             move_scores.append((move, score))
         
-        # Sort by score and pick best (or random from top 3 for Easy)
+        # Sort by score
         move_scores.sort(key=lambda x: x[1], reverse=True)
         
-        if difficulty == 'easy' and len(move_scores) >= 3:
-            # Easy: pick randomly from top 3 moves
-            return random.choice(move_scores[:3])[0]
+        if difficulty == 'easy' and len(move_scores) >= 5:
+            # Easy: pick randomly from top 5 moves
+            return random.choice(move_scores[:5])[0]
         else:
             # Strong: pick best move
             return move_scores[0][0]
