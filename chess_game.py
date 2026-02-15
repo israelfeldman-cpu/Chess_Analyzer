@@ -124,31 +124,72 @@ class ChessGame:
         return best_moves
     
     def get_computer_move(self, difficulty='normal'):
-        """Get computer move using Stockfish with very tight limits"""
+        """Get computer move - uses Stockfish locally, simple eval on Render"""
         if self.board.is_game_over():
             return None
         
+        import os
+        # On Render, Stockfish is too slow - use simple evaluation instead
+        if os.environ.get('RENDER'):
+            return self._get_simple_move(difficulty)
+        
+        # Locally: use full Stockfish
         try:
             if difficulty == 'easy':
-                # Easy: Depth 1, 0.1s max, 1000 nodes - forces instant response
-                result = self.engine.play(self.board, chess.engine.Limit(depth=1, time=0.1, nodes=1000))
+                result = self.engine.play(self.board, chess.engine.Limit(depth=5, time=0.5))
             else:
-                # Strong: Depth 3, 0.3s max, 5000 nodes - forces quick response  
-                result = self.engine.play(self.board, chess.engine.Limit(depth=3, time=0.3, nodes=5000))
+                result = self.engine.play(self.board, chess.engine.Limit(depth=10, time=2.0))
             
             if result and result.move:
                 return result.move
-            else:
-                # Fallback to random move if Stockfish fails
-                import random
-                legal_moves = list(self.board.legal_moves)
-                return random.choice(legal_moves) if legal_moves else None
         except Exception as e:
-            print(f"Stockfish error in get_computer_move: {e}")
-            # Fallback: return a random legal move
-            import random
-            legal_moves = list(self.board.legal_moves)
-            return random.choice(legal_moves) if legal_moves else None
+            print(f"Stockfish error: {e}")
+        
+        # Fallback to simple move
+        return self._get_simple_move(difficulty)
+    
+    def _get_simple_move(self, difficulty='normal'):
+        """Fast move selection using simple piece values"""
+        import random
+        
+        legal_moves = list(self.board.legal_moves)
+        if not legal_moves:
+            return None
+        
+        # Score each move
+        move_scores = []
+        for move in legal_moves:
+            score = 0
+            
+            # Captures are good
+            if self.board.is_capture(move):
+                captured_piece = self.board.piece_at(move.to_square)
+                if captured_piece:
+                    piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, 
+                                   chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
+                    score += piece_values.get(captured_piece.piece_type, 0) * 10
+            
+            # Checks are good
+            self.board.push(move)
+            if self.board.is_check():
+                score += 5
+            self.board.pop()
+            
+            # Add some randomness for Easy mode
+            if difficulty == 'easy':
+                score += random.randint(-10, 10)
+            
+            move_scores.append((move, score))
+        
+        # Sort by score and pick best (or random from top 3 for Easy)
+        move_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        if difficulty == 'easy' and len(move_scores) >= 3:
+            # Easy: pick randomly from top 3 moves
+            return random.choice(move_scores[:3])[0]
+        else:
+            # Strong: pick best move
+            return move_scores[0][0]
     
     def get_legal_moves(self, from_square):
         try:
