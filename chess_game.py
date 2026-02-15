@@ -124,17 +124,17 @@ class ChessGame:
         return best_moves
     
     def get_computer_move(self, difficulty='normal'):
-        """Get computer move using Stockfish"""
+        """Get computer move using Stockfish with very tight limits"""
         if self.board.is_game_over():
             return None
         
         try:
             if difficulty == 'easy':
-                # Easy: Depth 5, ~0.5 seconds (beginner level ~1200 ELO)
-                result = self.engine.play(self.board, chess.engine.Limit(depth=5, time=0.5))
+                # Easy: Depth 1, 0.1s max, 1000 nodes - forces instant response
+                result = self.engine.play(self.board, chess.engine.Limit(depth=1, time=0.1, nodes=1000))
             else:
-                # Strong: Depth 10, ~2 seconds (intermediate level ~1800 ELO)
-                result = self.engine.play(self.board, chess.engine.Limit(depth=10, time=2.0))
+                # Strong: Depth 3, 0.3s max, 5000 nodes - forces quick response  
+                result = self.engine.play(self.board, chess.engine.Limit(depth=3, time=0.3, nodes=5000))
             
             if result and result.move:
                 return result.move
