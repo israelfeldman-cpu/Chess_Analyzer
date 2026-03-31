@@ -148,84 +148,175 @@ class ChessGame:
         # Fallback to simple move
         return self._get_simple_move(difficulty)
     
+    def _evaluate_position(self):
+        """Advanced position evaluation using piece-square tables and positional factors"""
+        if self.board.is_checkmate():
+            return -100000 if self.board.turn else 100000
+        if self.board.is_stalemate() or self.board.is_insufficient_material():
+            return 0
+        
+        # Piece values
+        piece_values = {
+            chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330,
+            chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 20000
+        }
+        
+        # Piece-square tables (values for white from white's perspective)
+        pawn_table = [
+            0,  0,  0,  0,  0,  0,  0,  0,
+            50, 50, 50, 50, 50, 50, 50, 50,
+            10, 10, 20, 30, 30, 20, 10, 10,
+            5,  5, 10, 25, 25, 10,  5,  5,
+            0,  0,  0, 20, 20,  0,  0,  0,
+            5, -5,-10,  0,  0,-10, -5,  5,
+            5, 10, 10,-20,-20, 10, 10,  5,
+            0,  0,  0,  0,  0,  0,  0,  0
+        ]
+        
+        knight_table = [
+            -50,-40,-30,-30,-30,-30,-40,-50,
+            -40,-20,  0,  0,  0,  0,-20,-40,
+            -30,  0, 10, 15, 15, 10,  0,-30,
+            -30,  5, 15, 20, 20, 15,  5,-30,
+            -30,  0, 15, 20, 20, 15,  0,-30,
+            -30,  5, 10, 15, 15, 10,  5,-30,
+            -40,-20,  0,  5,  5,  0,-20,-40,
+            -50,-40,-30,-30,-30,-30,-40,-50
+        ]
+        
+        bishop_table = [
+            -20,-10,-10,-10,-10,-10,-10,-20,
+            -10,  0,  0,  0,  0,  0,  0,-10,
+            -10,  0,  5, 10, 10,  5,  0,-10,
+            -10,  5,  5, 10, 10,  5,  5,-10,
+            -10,  0, 10, 10, 10, 10,  0,-10,
+            -10, 10, 10, 10, 10, 10, 10,-10,
+            -10,  5,  0,  0,  0,  0,  5,-10,
+            -20,-10,-10,-10,-10,-10,-10,-20
+        ]
+        
+        king_middle_table = [
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -30,-40,-40,-50,-50,-40,-40,-30,
+            -20,-30,-30,-40,-40,-30,-30,-20,
+            -10,-20,-20,-20,-20,-20,-20,-10,
+            20, 20,  0,  0,  0,  0, 20, 20,
+            20, 30, 10,  0,  0, 10, 30, 20
+        ]
+        
+        score = 0
+        
+        for square in chess.SQUARES:
+            piece = self.board.piece_at(square)
+            if piece is None:
+                continue
+            
+            # Material value
+            value = piece_values.get(piece.piece_type, 0)
+            
+            # Piece-square table bonus
+            sq_idx = square if piece.color == chess.WHITE else (63 - square)
+            
+            if piece.piece_type == chess.PAWN:
+                value += pawn_table[sq_idx]
+            elif piece.piece_type == chess.KNIGHT:
+                value += knight_table[sq_idx]
+            elif piece.piece_type == chess.BISHOP:
+                value += bishop_table[sq_idx]
+            elif piece.piece_type == chess.KING:
+                value += king_middle_table[sq_idx]
+            
+            # Add to score (positive for white, negative for black)
+            if piece.color == chess.WHITE:
+                score += value
+            else:
+                score -= value
+        
+        # Mobility bonus
+        original_turn = self.board.turn
+        self.board.turn = chess.WHITE
+        white_mobility = len(list(self.board.legal_moves))
+        self.board.turn = chess.BLACK
+        black_mobility = len(list(self.board.legal_moves))
+        self.board.turn = original_turn
+        score += (white_mobility - black_mobility) * 5
+        
+        # Return score from current player's perspective
+        return score if self.board.turn == chess.WHITE else -score
+    
+    def _minimax(self, depth, alpha, beta, maximizing):
+        """Minimax with alpha-beta pruning for stronger play"""
+        if depth == 0 or self.board.is_game_over():
+            return self._evaluate_position()
+        
+        if maximizing:
+            max_eval = -999999
+            for move in self.board.legal_moves:
+                self.board.push(move)
+                eval_score = self._minimax(depth - 1, alpha, beta, False)
+                self.board.pop()
+                max_eval = max(max_eval, eval_score)
+                alpha = max(alpha, eval_score)
+                if beta <= alpha:
+                    break
+            return max_eval
+        else:
+            min_eval = 999999
+            for move in self.board.legal_moves:
+                self.board.push(move)
+                eval_score = self._minimax(depth - 1, alpha, beta, True)
+                self.board.pop()
+                min_eval = min(min_eval, eval_score)
+                beta = min(beta, eval_score)
+                if beta <= alpha:
+                    break
+            return min_eval
+    
     def _get_simple_move(self, difficulty='normal'):
-        """Fast move selection using piece-square tables and tactical evaluation"""
+        """Enhanced bot with minimax search and positional evaluation"""
         import random
         
         legal_moves = list(self.board.legal_moves)
         if not legal_moves:
             return None
         
-        # Piece values
-        piece_values = {
-            chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330, 
-            chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 20000
-        }
+        # Determine search depth based on difficulty
+        if difficulty == 'easy':
+            depth = 1
+        else:
+            depth = 2  # Strong bot uses deeper search
         
-        # Score each move
-        move_scores = []
+        best_move = None
+        best_score = -999999
+        
+        # Quick checkmate detection
         for move in legal_moves:
-            score = 0
-            moving_piece = self.board.piece_at(move.from_square)
-            
-            # Captures - value based on victim minus attacker value difference
-            if self.board.is_capture(move):
-                captured_piece = self.board.piece_at(move.to_square)
-                if captured_piece and moving_piece:
-                    victim_value = piece_values.get(captured_piece.piece_type, 0)
-                    attacker_value = piece_values.get(moving_piece.piece_type, 0)
-                    # MVV-LVA: Most Valuable Victim - Least Valuable Attacker
-                    score += victim_value * 10 - attacker_value // 10
-            
-            # Make the move to evaluate position
             self.board.push(move)
-            
-            # Checks are valuable
-            if self.board.is_check():
-                score += 50
-            
-            # Checkmate is best
             if self.board.is_checkmate():
-                score += 100000
-            
-            # Avoid moves that lose material
-            # Check if this square is attacked after moving
-            if self.board.is_attacked_by(not self.board.turn, move.to_square):
-                if moving_piece:
-                    score -= piece_values.get(moving_piece.piece_type, 0) // 2
-            
-            # Center control bonus
-            center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
-            if move.to_square in center_squares:
-                score += 20
-            
-            # Development bonus in opening (first 10 moves)
-            if len(self.board.move_stack) < 10:
-                if moving_piece and moving_piece.piece_type in [chess.KNIGHT, chess.BISHOP]:
-                    score += 15
-            
+                self.board.pop()
+                return move
+            self.board.pop()
+        
+        # Evaluate each move with minimax
+        for move in legal_moves:
+            self.board.push(move)
+            score = -self._minimax(depth - 1, -999999, 999999, False)
             self.board.pop()
             
-            # Add randomness for Easy mode
+            # Add small randomness for Easy mode
             if difficulty == 'easy':
-                score += random.randint(-30, 30)
+                score += random.randint(-50, 50)
             
-            move_scores.append((move, score))
+            if score > best_score:
+                best_score = score
+                best_move = move
         
-        # Sort by score
-        move_scores.sort(key=lambda x: x[1], reverse=True)
-        
-        if difficulty == 'easy' and len(move_scores) >= 5:
-            # Easy: pick randomly from top 5 moves
-            return random.choice(move_scores[:5])[0]
-        else:
-            # Strong: pick best move
-            return move_scores[0][0]
+        return best_move
     
     def get_fast_analysis(self, num_lines=5):
-        """Fast tactical analysis for web - returns top moves with scores instantly"""
-        import random
-        
+        """Very strong tactical analysis using minimax with alpha-beta pruning"""
         if self.board.is_game_over():
             return []
         
@@ -233,112 +324,78 @@ class ChessGame:
         if not legal_moves:
             return []
         
-        # Piece values
-        piece_values = {
-            chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330, 
-            chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 20000
-        }
+        # Search depth 3 for very strong analysis (depth 2 would be faster but weaker)
+        search_depth = 3
         
-        # Score each move with deeper evaluation
-        move_scores = []
+        move_evaluations = []
+        
+        # Evaluate each move with minimax
         for move in legal_moves:
-            score = 0
-            moving_piece = self.board.piece_at(move.from_square)
-            
-            # Capture evaluation (MVV-LVA)
-            if self.board.is_capture(move):
-                captured_piece = self.board.piece_at(move.to_square)
-                if captured_piece and moving_piece:
-                    victim_value = piece_values.get(captured_piece.piece_type, 0)
-                    attacker_value = piece_values.get(moving_piece.piece_type, 0)
-                    score += victim_value * 10 - attacker_value // 10
-            
-            # Make the move to evaluate resulting position
             self.board.push(move)
             
-            # Checkmate is best
+            # Check for immediate checkmate
             if self.board.is_checkmate():
-                score += 100000
-            
-            # Check bonus
-            if self.board.is_check():
-                score += 50
-            
-            # Material safety - is the moved piece attacked?
-            if self.board.is_attacked_by(not self.board.turn, move.to_square):
-                if moving_piece:
-                    score -= piece_values.get(moving_piece.piece_type, 0) // 2
-            
-            # Control and activity evaluation
-            center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
-            if move.to_square in center_squares:
-                score += 20
-            
-            # Development bonus
-            if len(self.board.move_stack) < 10:
-                if moving_piece and moving_piece.piece_type in [chess.KNIGHT, chess.BISHOP]:
-                    score += 15
-            
-            # King safety - castling is good
-            if moving_piece and moving_piece.piece_type == chess.KING:
-                from_file = chess.square_file(move.from_square)
-                to_file = chess.square_file(move.to_square)
-                if abs(to_file - from_file) == 2:  # Castling
-                    score += 40
-            
-            # Evaluate opponent's responses (1-ply lookahead)
-            opponent_threats = 0
-            opponent_moves = list(self.board.legal_moves)
-            for opp_move in opponent_moves[:20]:  # Limit for speed
-                if self.board.is_capture(opp_move):
-                    opp_captured = self.board.piece_at(opp_move.to_square)
-                    if opp_captured:
-                        opponent_threats += piece_values.get(opp_captured.piece_type, 0)
-            
-            # Penalize moves that leave opponent with strong threats
-            score -= opponent_threats // 50
+                score = 100000
+            else:
+                # Use minimax to evaluate position after this move
+                score = -self._minimax(search_depth - 1, -999999, 999999, False)
             
             self.board.pop()
-            
-            move_scores.append((move, score))
+            move_evaluations.append((move, score))
         
-        # Sort by score
-        move_scores.sort(key=lambda x: x[1], reverse=True)
+        # Sort by score (best first)
+        move_evaluations.sort(key=lambda x: x[1], reverse=True)
         
-        # Format top N moves
+        # Format top N moves with continuation lines
         result = []
-        for i, (move, score) in enumerate(move_scores[:num_lines]):
-            # Convert score to centipawn-like display
-            eval_str = f"{score / 100.0:+.2f}"
+        for move, score in move_evaluations[:num_lines]:
+            # Convert score to centipawn display
+            if score >= 100000:
+                eval_str = "M1"  # Mate in 1
+            elif score <= -100000:
+                eval_str = "-M1"
+            else:
+                eval_str = f"{score / 100.0:+.2f}"
             
-            # Get move in SAN notation
-            san_move = self.board.san(move)
+            # Get principal variation (best continuation)
+            pv_moves = []
+            temp_moves = []
             
-            # For better analysis, show 2-3 moves ahead if checkmate/capture
-            pv_moves = [san_move]
-            
-            # Simulate the move to see follow-up
+            # Play out the move and get best responses
             self.board.push(move)
-            if not self.board.is_game_over() and len(pv_moves) < 3:
-                # Show opponent's likely response (top scoring move)
-                opp_legal = list(self.board.legal_moves)
-                if opp_legal:
-                    # Quick eval of opponent responses
-                    opp_scores = []
-                    for opp_move in opp_legal[:15]:  # Limit for speed
-                        opp_score = 0
-                        if self.board.is_capture(opp_move):
-                            cap_piece = self.board.piece_at(opp_move.to_square)
-                            if cap_piece:
-                                opp_score += piece_values.get(cap_piece.piece_type, 0)
-                        opp_scores.append((opp_move, opp_score))
-                    
-                    if opp_scores:
-                        opp_scores.sort(key=lambda x: x[1], reverse=True)
-                        best_opp = opp_scores[0][0]
-                        pv_moves.append(self.board.san(best_opp))
+            pv_moves.append(self.board.san(temp_moves[-1] if temp_moves else move))
+            temp_moves.append(move)
             
-            self.board.pop()
+            # Get 2-3 move continuation
+            for depth in range(min(2, search_depth)):
+                if self.board.is_game_over():
+                    break
+                
+                # Find best move at this depth
+                best_continuation = None
+                best_cont_score = -999999
+                
+                for cont_move in list(self.board.legal_moves)[:15]:  # Limit for speed
+                    self.board.push(cont_move)
+                    cont_score = -self._evaluate_position()
+                    self.board.pop()
+                    
+                    if cont_score > best_cont_score:
+                        best_cont_score = cont_score
+                        best_continuation = cont_move
+                
+                if best_continuation:
+                    san = self.board.san(best_continuation)
+                    pv_moves.append(san)
+                    self.board.push(best_continuation)
+                    temp_moves.append(best_continuation)
+            
+            # Undo all temporary moves
+            for _ in temp_moves:
+                self.board.pop()
+            
+            # Fix: Get the correct SAN for the first move
+            pv_moves[0] = self.board.san(move)
             
             result.append({
                 "eval": eval_str,
