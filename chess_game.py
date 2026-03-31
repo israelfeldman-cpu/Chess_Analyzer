@@ -83,14 +83,14 @@ class ChessGame:
         if self.board.is_game_over():
             return None
         
-        # Only cap timeout on Render deployment (not locally)
         # Check if running on Render by looking for RENDER environment variable
         import os
         if os.environ.get('RENDER'):
-            # Cap at 20 seconds for Render's 70s HTTP timeout (with buffer)
-            time_limit = min(time_limit, 20.0)
-        # Locally: use full time_limit from slider (1-30 minutes)
+            # On Render: use fast algorithmic analysis instead of Stockfish
+            # This completes instantly and avoids the 70s HTTP timeout
+            return self.get_fast_analysis(num_lines=5)
         
+        # Locally: use full Stockfish analysis with time_limit from slider (1-30 minutes)
         # Use only time limit for predictable results
         result = self.engine.analyse(
             self.board, 
@@ -221,6 +221,131 @@ class ChessGame:
         else:
             # Strong: pick best move
             return move_scores[0][0]
+    
+    def get_fast_analysis(self, num_lines=5):
+        """Fast tactical analysis for web - returns top moves with scores instantly"""
+        import random
+        
+        if self.board.is_game_over():
+            return []
+        
+        legal_moves = list(self.board.legal_moves)
+        if not legal_moves:
+            return []
+        
+        # Piece values
+        piece_values = {
+            chess.PAWN: 100, chess.KNIGHT: 320, chess.BISHOP: 330, 
+            chess.ROOK: 500, chess.QUEEN: 900, chess.KING: 20000
+        }
+        
+        # Score each move with deeper evaluation
+        move_scores = []
+        for move in legal_moves:
+            score = 0
+            moving_piece = self.board.piece_at(move.from_square)
+            
+            # Capture evaluation (MVV-LVA)
+            if self.board.is_capture(move):
+                captured_piece = self.board.piece_at(move.to_square)
+                if captured_piece and moving_piece:
+                    victim_value = piece_values.get(captured_piece.piece_type, 0)
+                    attacker_value = piece_values.get(moving_piece.piece_type, 0)
+                    score += victim_value * 10 - attacker_value // 10
+            
+            # Make the move to evaluate resulting position
+            self.board.push(move)
+            
+            # Checkmate is best
+            if self.board.is_checkmate():
+                score += 100000
+            
+            # Check bonus
+            if self.board.is_check():
+                score += 50
+            
+            # Material safety - is the moved piece attacked?
+            if self.board.is_attacked_by(not self.board.turn, move.to_square):
+                if moving_piece:
+                    score -= piece_values.get(moving_piece.piece_type, 0) // 2
+            
+            # Control and activity evaluation
+            center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
+            if move.to_square in center_squares:
+                score += 20
+            
+            # Development bonus
+            if len(self.board.move_stack) < 10:
+                if moving_piece and moving_piece.piece_type in [chess.KNIGHT, chess.BISHOP]:
+                    score += 15
+            
+            # King safety - castling is good
+            if moving_piece and moving_piece.piece_type == chess.KING:
+                from_file = chess.square_file(move.from_square)
+                to_file = chess.square_file(move.to_square)
+                if abs(to_file - from_file) == 2:  # Castling
+                    score += 40
+            
+            # Evaluate opponent's responses (1-ply lookahead)
+            opponent_threats = 0
+            opponent_moves = list(self.board.legal_moves)
+            for opp_move in opponent_moves[:20]:  # Limit for speed
+                if self.board.is_capture(opp_move):
+                    opp_captured = self.board.piece_at(opp_move.to_square)
+                    if opp_captured:
+                        opponent_threats += piece_values.get(opp_captured.piece_type, 0)
+            
+            # Penalize moves that leave opponent with strong threats
+            score -= opponent_threats // 50
+            
+            self.board.pop()
+            
+            move_scores.append((move, score))
+        
+        # Sort by score
+        move_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Format top N moves
+        result = []
+        for i, (move, score) in enumerate(move_scores[:num_lines]):
+            # Convert score to centipawn-like display
+            eval_str = f"{score / 100.0:+.2f}"
+            
+            # Get move in SAN notation
+            san_move = self.board.san(move)
+            
+            # For better analysis, show 2-3 moves ahead if checkmate/capture
+            pv_moves = [san_move]
+            
+            # Simulate the move to see follow-up
+            self.board.push(move)
+            if not self.board.is_game_over() and len(pv_moves) < 3:
+                # Show opponent's likely response (top scoring move)
+                opp_legal = list(self.board.legal_moves)
+                if opp_legal:
+                    # Quick eval of opponent responses
+                    opp_scores = []
+                    for opp_move in opp_legal[:15]:  # Limit for speed
+                        opp_score = 0
+                        if self.board.is_capture(opp_move):
+                            cap_piece = self.board.piece_at(opp_move.to_square)
+                            if cap_piece:
+                                opp_score += piece_values.get(cap_piece.piece_type, 0)
+                        opp_scores.append((opp_move, opp_score))
+                    
+                    if opp_scores:
+                        opp_scores.sort(key=lambda x: x[1], reverse=True)
+                        best_opp = opp_scores[0][0]
+                        pv_moves.append(self.board.san(best_opp))
+            
+            self.board.pop()
+            
+            result.append({
+                "eval": eval_str,
+                "moves": " ".join(pv_moves)
+            })
+        
+        return result
     
     def get_legal_moves(self, from_square):
         try:
